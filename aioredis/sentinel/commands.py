@@ -5,7 +5,7 @@ from ..commands import Redis
 from .pool import create_sentinel_pool
 
 
-async def create_sentinel(sentinels, *, db=None, password=None,
+async def create_sentinel(sentinels, *, db=None, password=None, sentinel_password=None,
                           encoding=None, minsize=1, maxsize=10,
                           ssl=None, timeout=0.2, loop=None):
     """Creates Redis Sentinel client.
@@ -19,6 +19,7 @@ async def create_sentinel(sentinels, *, db=None, password=None,
     pool = await create_sentinel_pool(sentinels,
                                       db=db,
                                       password=password,
+                                      sentinel_password=sentinel_password,
                                       encoding=encoding,
                                       minsize=minsize,
                                       maxsize=maxsize,

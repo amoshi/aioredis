@@ -24,7 +24,7 @@ _NON_DISCOVERED = object()
 _logger = sentinel_logger.getChild('monitor')
 
 
-async def create_sentinel_pool(sentinels, *, db=None, password=None,
+async def create_sentinel_pool(sentinels, *, db=None, password=None, sentinel_password=None,
                                encoding=None, minsize=1, maxsize=10,
                                ssl=None, parser=None, timeout=0.2, loop=None):
     """Create SentinelPool."""
@@ -36,6 +36,7 @@ async def create_sentinel_pool(sentinels, *, db=None, password=None,
 
     pool = SentinelPool(sentinels, db=db,
                         password=password,
+                        sentinel_password=sentinel_password,
                         ssl=ssl,
                         encoding=encoding,
                         parser=parser,
@@ -54,7 +55,7 @@ class SentinelPool:
     as well as services' connections.
     """
 
-    def __init__(self, sentinels, *, db=None, password=None, ssl=None,
+    def __init__(self, sentinels, *, db=None, sentinel_password=None, password=None, ssl=None,
                  encoding=None, parser=None, minsize, maxsize, timeout,
                  loop=None):
         # TODO: deprecation note
@@ -73,6 +74,7 @@ class SentinelPool:
         self._parser_class = parser
         self._redis_db = db
         self._redis_password = password
+        self._sentinel_password = sentinel_password
         self._redis_ssl = ssl
         self._redis_encoding = encoding
         self._redis_minsize = minsize
@@ -206,7 +208,7 @@ class SentinelPool:
         tasks = []
         pools = []
         for addr in self._sentinels:    # iterate over unordered set
-            tasks.append(self._connect_sentinel(addr, timeout, pools))
+            tasks.append(self._connect_sentinel(addr, timeout, pools, self._sentinel_password))
         done, pending = await asyncio.wait(tasks,
                                            return_when=ALL_COMPLETED)
         assert not pending, ("Expected all tasks to complete", done, pending)
@@ -228,14 +230,14 @@ class SentinelPool:
             await pool.execute_pubsub(
                 b'psubscribe', self._monitor.pattern('*'))
 
-    async def _connect_sentinel(self, address, timeout, pools):
+    async def _connect_sentinel(self, address, timeout, pools, sentinel_password):
         """Try to connect to specified Sentinel returning either
         connections pool or exception.
         """
         try:
             with async_timeout(timeout):
                 pool = await create_pool(
-                    address, minsize=1, maxsize=2,
+                    address, password=sentinel_password, minsize=1, maxsize=2,
                     parser=self._parser_class,
                     )
             pools.append(pool)
